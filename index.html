@@ -1022,7 +1022,7 @@
       $("homePage").classList.add("hidden");
       $("watchPage").classList.remove("hidden");
       window.scrollTo({ top: 0, behavior: "smooth" });
-      $("watchTitle").textContent = video.title;
+      $("watchTitle").textContent = video.description || "";
       $("watchCategory").textContent = video.category;
       $("watchDesc").textContent = video.description || "No description added.";
       renderEmbed(video.embed);
@@ -1060,7 +1060,7 @@
         const item = document.createElement("button");
         item.className = "related-item";
         item.type = "button";
-        item.innerHTML = `<img src="${escapeAttr(video.thumbnail || fallbackThumb)}" alt="${escapeAttr(video.title)} thumbnail"><h4>${escapeHtml(video.title)}</h4>`;
+        item.innerHTML = `<img src="${escapeAttr(video.thumbnail || fallbackThumb)}" alt="${escapeAttr(video.title)} thumbnail"><h4>${escapeHtml(video.description || "")}</h4>`;
         item.addEventListener("click", () => openVideo(video.id));
         $("relatedList").appendChild(item);
       });
