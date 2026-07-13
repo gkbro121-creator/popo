@@ -152,6 +152,10 @@
       background: var(--orange);
       color: #fff;
     }
+    .sort-select {
+      appearance: auto;
+      outline: none;
+    }
 
     .section-head {
       display: flex;
@@ -646,7 +650,11 @@
 
   <main id="homePage" class="page">
     <nav class="category-bar" aria-label="Movie categories">
-      <button class="cat active" type="button" data-category="All">All</button>
+      <select id="sortMode" class="cat sort-select" aria-label="Video order">
+        <option value="new" selected>New</option>
+        <option value="random">Random</option>
+        <option value="last">Last</option>
+      </select>
       <button class="cat" type="button" data-category="Sri Lanka">Sri Lanka</button>
       <button class="cat" type="button" data-category="India">India</button>
       <button class="cat" type="button" data-category="18+">18+</button>
@@ -741,6 +749,8 @@
     let currentCategory = "All";
     let currentQuery = "";
     let currentPage = 1;
+    let currentSort = "new";
+    let randomRank = new Map();
 
     const $ = (id) => document.getElementById(id);
 
@@ -764,17 +774,28 @@
         renderGrid();
       });
 
-      document.querySelectorAll(".cat").forEach((button) => {
+      document.querySelectorAll("button.cat").forEach((button) => {
         button.addEventListener("click", () => {
           const category = button.dataset.category;
           setCategory(category);
         });
       });
 
+      $("sortMode").addEventListener("change", () => {
+        currentSort = $("sortMode").value;
+        currentCategory = "All";
+        currentPage = 1;
+        if (currentSort === "random") buildRandomRank();
+        document.querySelectorAll("button.cat").forEach((btn) => btn.classList.remove("active"));
+        renderGrid();
+      });
+
       document.querySelector(".brand").addEventListener("click", (event) => {
         event.preventDefault();
         $("searchInput").value = "";
         currentQuery = "";
+        currentSort = "new";
+        $("sortMode").value = "new";
         setCategory("All");
         showHome();
       });
@@ -821,6 +842,7 @@
         if (!response.ok) throw new Error("Google Sheet CSV request failed.");
         const csvText = await response.text();
         videos = csvToVideos(csvText);
+        if (currentSort === "random") buildRandomRank();
         currentPage = 1;
         renderGrid();
       } catch (error) {
@@ -926,20 +948,42 @@
     function setCategory(category) {
       currentCategory = category;
       currentPage = 1;
-      document.querySelectorAll(".cat").forEach((btn) => {
+      document.querySelectorAll("button.cat").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.category === category);
       });
       renderGrid();
     }
 
     function filteredVideos() {
-      return videos
+      return applyCurrentSort(videos
         .slice()
         .filter((video) => currentCategory === "All" || video.category === currentCategory)
         .filter((video) => {
           if (!currentQuery) return true;
           return [video.title, video.category, video.description].join(" ").toLowerCase().includes(currentQuery);
-        });
+        }));
+    }
+
+    function applyCurrentSort(list) {
+      if (currentSort === "random") {
+        if (!randomRank.size) buildRandomRank();
+        return list.sort((a, b) => (randomRank.get(a.id) ?? 0) - (randomRank.get(b.id) ?? 0));
+      }
+
+      if (currentSort === "last") {
+        return list.sort((a, b) => a.rowIndex - b.rowIndex);
+      }
+
+      return list.sort((a, b) => b.rowIndex - a.rowIndex);
+    }
+
+    function buildRandomRank() {
+      const ids = videos.map((video) => video.id);
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      randomRank = new Map(ids.map((id, index) => [id, index]));
     }
 
     function renderGrid() {
@@ -1054,7 +1098,7 @@
     }
 
     function renderRelated(currentId) {
-      const related = videos.filter((video) => video.id !== currentId).slice(0, 8);
+      const related = applyCurrentSort(videos.filter((video) => video.id !== currentId)).slice(0, 8);
       $("relatedList").innerHTML = "";
       related.forEach((video) => {
         const item = document.createElement("button");
